@@ -49,7 +49,7 @@ class VehicleRepositoryImpl implements VehicleRepository {
   }
 }
 
-// On a déplacé la fonction de parsing du Datasource vers le Repository
+// La fonction à passer à compute
 List<VehicleModel> _parseVehicles(String responseBody) {
   final parsed = jsonDecode(responseBody);
   final List<dynamic> results = parsed['Results'];

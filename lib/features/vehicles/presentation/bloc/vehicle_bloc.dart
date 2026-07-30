@@ -23,23 +23,28 @@ class VehicleBloc extends Bloc<VehicleEvent, VehicleState> {
     LoadVehicles event,
     Emitter<VehicleState> emit,
   ) async {
-    emit(VehicleLoading()); // État: Initial Loading
+    // État: Initial Loading
+    emit(VehicleLoading());
     final (failure, vehicles) = await repository.getVehicles();
     if (failure != null) {
-      emit(VehicleError(message: failure.message)); // État: Error
+      // État: Error
+      emit(VehicleError(message: failure.message));
     } else if (vehicles == null || vehicles.isEmpty) {
-      emit(VehicleEmpty()); // État: Empty
+      // État: Empty
+      emit(VehicleEmpty());
     } else {
       // Succès ! On sauvegarde tout en mémoire (instantané et léger)
       _masterList = vehicles;
-      // On découpe juste les 50 premiers pour l'affichage initial
+
+      // On découpe juste les 30 premiers pour l'affichage initial
       final firstPage = _masterList.take(_pageSize).toList();
-      emit(VehicleLoaded(vehicles: firstPage)); // État: Loaded
+      // État: Loaded
+      emit(VehicleLoaded(vehicles: firstPage));
     }
   }
 
   void _onSearchVehicles(SearchVehicles event, Emitter<VehicleState> emit) {
-    // CORRECTION : On vérifie juste qu'on a bien téléchargé les données.
+    // On vérifie juste qu'on a bien téléchargé les données.
     // Même si on est dans l'état VehicleEmpty, on peut quand même faire une nouvelle recherche !
     if (_masterList.isEmpty) return;
 

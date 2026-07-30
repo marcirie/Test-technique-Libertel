@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 
 abstract class VehicleRemoteDataSource {
-  Future<String> getVehicles(); // Il renvoie juste du texte brut
+  // Il renvoie juste du texte brut
+  Future<String> getVehicles();
 }
 
 class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
