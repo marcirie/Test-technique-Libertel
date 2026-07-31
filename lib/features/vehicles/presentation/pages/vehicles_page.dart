@@ -1,9 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:test_technique/core/theme/app_theme.dart';
 import 'package:test_technique/features/vehicles/presentation/bloc/vehicle_bloc.dart';
 import 'package:test_technique/features/vehicles/presentation/bloc/vehicle_event.dart';
 import 'package:test_technique/features/vehicles/presentation/bloc/vehicle_state.dart';
+import 'package:test_technique/features/vehicles/presentation/widgets/vehicle_card.dart';
+import 'package:test_technique/features/vehicles/presentation/widgets/shimmer_loading.dart';
+import 'package:test_technique/features/vehicles/presentation/widgets/empty_state_widget.dart';
+import 'package:test_technique/features/vehicles/presentation/widgets/error_state_widget.dart';
 
 class VehiclesPage extends StatefulWidget {
   const VehiclesPage({super.key});
@@ -15,8 +20,11 @@ class VehiclesPage extends StatefulWidget {
 class _VehiclesPageState extends State<VehiclesPage> {
   // Le contrôleur qui va écouter le défilement
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   Timer? _debounce;
+  bool _isSearchFocused = false;
 
   @override
   void initState() {
@@ -26,6 +34,11 @@ class _VehiclesPageState extends State<VehiclesPage> {
 
     // On accroche notre écouteur de défilement
     _scrollController.addListener(_onScroll);
+
+    // Écouter le focus du champ de recherche pour animer la barre
+    _searchFocusNode.addListener(() {
+      setState(() => _isSearchFocused = _searchFocusNode.hasFocus);
+    });
   }
 
   void _onScroll() {
@@ -39,6 +52,9 @@ class _VehiclesPageState extends State<VehiclesPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -54,90 +70,148 @@ class _VehiclesPageState extends State<VehiclesPage> {
     });
   }
 
+  void _clearSearch() {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    context.read<VehicleBloc>().add(SearchVehicles(query: ''));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Véhicules NHTSA'),
+        automaticallyImplyLeading: false,
+        backgroundColor: AppTheme.primaryDark,
+        centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.accentCyan,
+              ),
+              child: Icon(
+                Icons.directions_car_rounded,
+                color: AppTheme.primaryDark,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Véhicules NHTSA',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60.0),
+          preferredSize: const Size.fromHeight(80),
           child: Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(15),
             child: TextField(
-              onChanged: _onSearchChanged, // On branche notre fonction ici !
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onChanged: _onSearchChanged,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Rechercher une marque...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                prefixIcon: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.search_rounded,
+                    key: ValueKey(_isSearchFocused),
+                    color: _isSearchFocused
+                        ? AppTheme.accentCyan
+                        : AppTheme.textSecondary,
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.white,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: AppTheme.textSecondary,
+                          size: 20,
+                        ),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
               ),
             ),
           ),
         ),
       ),
-      // BlocBuilder réagit aux changements d'état de notre BLoC
-      body: BlocBuilder<VehicleBloc, VehicleState>(
-        builder: (context, state) {
-          if (state is VehicleLoading || state is VehicleInitial) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is VehicleEmpty) {
-            return const Center(child: Text('Aucun véhicule trouvé.'));
-          }
-
-          if (state is VehicleError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(state.message, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    // Bouton Retry !
-                    onPressed: () =>
-                        context.read<VehicleBloc>().add(LoadVehicles()),
-                    child: const Text('Réessayer'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (state is VehicleLoaded) {
-            return ListView.builder(
-              controller: _scrollController,
-              // Si on charge la suite, on triche en disant à la liste qu'il y a 1 élément en plus
-              // pour avoir la place d'afficher le chargeur en bas
-              itemCount: state.vehicles.length + (state.isLoadingMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                // Si l'index est égal à la taille de la liste, c'est la "fausse" case de la fin
-                if (index >= state.vehicles.length) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                final vehicle = state.vehicles[index];
-
-                // On utilise 'const' pour une haute performance (pas de re-rendu)
-                // Dans la réalité de ce code, on pourrait extraire ça dans un VehicleItemWidget
-                return ListTile(
-                  title: Text(vehicle.makeName),
-                  subtitle: Text('ID: ${vehicle.makeId}'),
-                  leading: const Icon(Icons.directions_car),
-                );
-              },
-            );
-          }
-
-          return const SizedBox();
-        },
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [_buildBody()],
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    return BlocBuilder<VehicleBloc, VehicleState>(
+      builder: (context, state) {
+        // ── Chargement initial ──
+        if (state is VehicleLoading || state is VehicleInitial) {
+          return const SliverFillRemaining(child: ShimmerLoading());
+        }
+
+        // ── État vide ──
+        if (state is VehicleEmpty) {
+          return const SliverFillRemaining(child: EmptyStateWidget());
+        }
+
+        // ── Erreur ──
+        if (state is VehicleError) {
+          return SliverFillRemaining(
+            child: ErrorStateWidget(
+              message: state.message,
+              onRetry: () => context.read<VehicleBloc>().add(LoadVehicles()),
+            ),
+          );
+        }
+
+        // ── Liste chargée ──
+        if (state is VehicleLoaded) {
+          return SliverPadding(
+            padding: const EdgeInsets.only(top: 8, bottom: 80),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  // Loader en bas de la liste
+                  if (index >= state.vehicles.length) {
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppTheme.accentCyan,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final vehicle = state.vehicles[index];
+                  return VehicleCard(vehicle: vehicle, index: index);
+                },
+                childCount:
+                    state.vehicles.length + (state.isLoadingMore ? 1 : 0),
+              ),
+            ),
+          );
+        }
+
+        return const SliverToBoxAdapter(child: SizedBox());
+      },
     );
   }
 }

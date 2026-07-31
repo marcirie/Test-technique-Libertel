@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:test_technique/core/theme/app_theme.dart';
 import 'package:test_technique/features/vehicles/presentation/bloc/vehicle_bloc.dart';
 import 'package:test_technique/features/vehicles/presentation/pages/vehicles_page.dart';
 import 'package:test_technique/injection_container.dart' as di;
@@ -8,6 +10,15 @@ import 'package:test_technique/injection_container.dart' as di;
 void main() async {
   // Obligatoire quand on veut lancer du code (comme get_it) avant runApp
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Barre de statut transparente pour un look immersif
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    ),
+  );
 
   await Hive.initFlutter();
   // 2. Ouvrir une boîte pour stocker nos données
@@ -27,10 +38,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Test Technique NHTSA',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.darkTheme,
       // BlocProvider agit comme un parapluie.
       // Il rend le BLoC disponible pour la page et ses enfants.
       home: BlocProvider(
